@@ -1,0 +1,14 @@
+MAN Comunication
+
+
+
+RECIBO SIMPLE
+Folio: 1
+Fecha: 2025-08-27
+Cliente: Francisco Gonzales
+Periodo: 2025-08 
+Concepto: Mensualidad Internet
+Método: EFECTIVO
+Total: $300.00
+
+Gracias por su pago.
