@@ -1,1 +1,140 @@
-<!-- index.html content here -->
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0b1020">
+<title>Recibos MAN Comunication</title>
+<style>
+:root{ --bg:#0b1020; --fg:#e8eefb; --muted:#9fb3d9; --card:#121935; }
+*{box-sizing:border-box} html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+.container{max-width:1200px;margin:20px auto;padding:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:var(--card);border:1px solid #1e2750;border-radius:14px;padding:14px}
+.small{font-size:12px;color:#9fb3d9}
+#lock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(11,16,32,.95);z-index:9999}
+.lock-card{width:min(360px,92vw);background:#121935;border:1px solid #1e2750;border-radius:16px;padding:18px}
+</style>
+</head>
+<body>
+<div id="lock"><div class="lock-card">
+  <h2>Recibos MAN • Acceso</h2>
+  <p class="small">PIN por defecto: <b>1029</b></p>
+  <input id="pin_input" type="password" inputmode="numeric" placeholder="PIN">
+  <button onclick="tryUnlock()">Desbloquear</button>
+  <div id="lock_msg" class="small" style="color:#ffb4b4;height:18px"></div>
+</div></div>
+
+<div id="app" style="display:none">
+  <div class="container">
+    <h1>Recibos MAN Comunication</h1>
+    <div class="grid">
+      <div class="card">
+        <h2>Preferencias</h2>
+        <label>Nombre del negocio</label><input id="p_biz" value="MAN Comunication">
+        <label>RFC / Leyenda</label><input id="p_legal">
+        <label>Domicilio / Teléfono</label><input id="p_addr">
+        <label>Ancho del papel</label><select id="p_width"><option value="58" selected>58 mm</option><option value="80">80 mm</option></select>
+        <label>Logo</label><input type="file" id="p_logo" accept="image/*" />
+        <div><button onclick="savePrefs()">Guardar</button><button onclick="clearLogo()">Quitar logo</button></div>
+        <h3>Seguridad</h3>
+        <label>Nuevo PIN</label><input id="p_pin" type="password" inputmode="numeric" placeholder="Ej. 1029">
+        <div><button onclick="changePIN()">Cambiar PIN</button></div>
+        <div class="small">El PIN vive sólo en este dispositivo.</div>
+      </div>
+      <div class="card">
+        <h2>Búsqueda / Historial</h2>
+        <button onclick="exportJSON()">Exportar respaldo (.json)</button>
+        <input type="file" id="importFile" style="display:none" accept=".json" onchange="importJSON(event)">
+        <button onclick="document.getElementById('importFile').click()">Importar respaldo</button>
+        <div id="msg" class="small" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="print-area" id="print-ticket"></div>
+<script>
+// SW
+if('serviceWorker' in navigator){ window.addEventListener('load', ()=>{
+  navigator.serviceWorker.register('./service-worker.js').catch(console.warn);
+});}
+
+// PIN
+function getStoredPin(){ return localStorage.getItem('pin_mc') || '1029'; }
+function tryUnlock(){
+  const v = (document.getElementById('pin_input').value||'').trim();
+  if(!v){ document.getElementById('lock_msg').textContent='Escribe el PIN'; return; }
+  if(v===getStoredPin()){
+    document.getElementById('lock').style.display='none';
+    document.getElementById('app').style.display='block';
+    initApp();
+  }else{
+    document.getElementById('lock_msg').textContent='PIN incorrecto';
+  }
+}
+function changePIN(){
+  const np = (document.getElementById('p_pin').value||'').trim();
+  if(!np || np.length<4){ return msg('PIN mínimo 4 dígitos'); }
+  localStorage.setItem('pin_mc', np);
+  document.getElementById('p_pin').value='';
+  msg('PIN actualizado');
+}
+
+// DB (minimal skeleton to support backup/restore)
+const dbName='caja_db_v3'; const state={db:null};
+function openDB(){ return new Promise((resolve,reject)=>{
+  const req = indexedDB.open(dbName,1);
+  req.onupgradeneeded=(e)=>{
+    const db=e.target.result;
+    const clients=db.createObjectStore('clients',{keyPath:'id',autoIncrement:true});
+    clients.createIndex('name','name',{unique:false});
+    const pays=db.createObjectStore('payments',{keyPath:'id',autoIncrement:true});
+    pays.createIndex('period_start','period_start',{unique:false});
+    pays.createIndex('client_id','client_id',{unique:false});
+    db.createObjectStore('meta',{keyPath:'key'});
+  };
+  req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
+});}
+function tx(store,mode='readonly'){ return state.db.transaction(store,mode).objectStore(store); }
+const $ = (id)=>document.getElementById(id);
+function msg(t){ const el=$('msg'); if(el){ el.textContent=t; setTimeout(()=>el.textContent='',2500);} }
+
+function loadPrefs(){
+  const d = JSON.parse(localStorage.getItem('prefs_mc')||'{}');
+  $('p_biz').value=d.biz||'MAN Comunication'; $('p_legal').value=d.legal||''; $('p_addr').value=d.addr||''; $('p_width').value=d.width||'58';
+}
+function savePrefs(){
+  const d={biz:$('p_biz').value.trim(),legal:$('p_legal').value.trim(),addr:$('p_addr').value.trim(),width:$('p_width').value};
+  localStorage.setItem('prefs_mc', JSON.stringify(d));
+  const file=$('p_logo').files[0];
+  if(file){ const r=new FileReader(); r.onload=()=>{localStorage.setItem('logo_mc', r.result); loadPrefs(); msg('Preferencias + logo guardados');}; r.readAsDataURL(file); }
+  else { loadPrefs(); msg('Preferencias guardadas'); }
+}
+function clearLogo(){ localStorage.removeItem('logo_mc'); loadPrefs(); msg('Logo eliminado'); }
+
+function exportJSON(){
+  const ps = tx('payments').getAll(); const cs = tx('clients').getAll(); const m = tx('meta').getAll();
+  ps.onsuccess=()=>{ cs.onsuccess=()=>{ m.onsuccess=()=>{
+    const data={clients:cs.result,payments:ps.result,meta:m.result};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='respaldo_recibos.json'; a.rel='noopener'; a.target='_blank'; a.click();
+  };};};
+}
+function importJSON(evt){
+  const file=evt.target.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const data=JSON.parse(r.result);
+      const t1=tx('clients','readwrite'); const t2=tx('payments','readwrite'); const t3=tx('meta','readwrite');
+      (data.clients||[]).forEach(c=>t1.put(c)); (data.payments||[]).forEach(p=>t2.put(p)); (data.meta||[]).forEach(x=>t3.put(x));
+      msg('Importado correctamente');
+    }catch(e){ msg('Error al importar: '+e.message); }
+  };
+  r.readAsText(file);
+}
+
+async function initApp(){ state.db = await openDB(); loadPrefs(); }
+</script>
+</body>
+</html>
