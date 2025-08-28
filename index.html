@@ -1,140 +1,710 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0b1020">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b1020">
 <title>Recibos MAN Comunication</title>
 <style>
 :root{ --bg:#0b1020; --fg:#e8eefb; --muted:#9fb3d9; --card:#121935; }
-*{box-sizing:border-box} html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+h1,h2{margin:0 0 8px}
 .container{max-width:1200px;margin:20px auto;padding:12px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.card{background:var(--card);border:1px solid #1e2750;border-radius:14px;padding:14px}
+.card{background:var(--card);border:1px solid #1e2750;border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+input,select,button,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #2a3870;background:#0e1530;color:var(--fg);outline:none}
+button{cursor:pointer}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.table{width:100%;border-collapse:collapse;margin-top:8px}
+.table th,.table td{border-bottom:1px solid #273269;padding:8px;text-align:left}
+.right{text-align:right}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
 .small{font-size:12px;color:#9fb3d9}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}}
+
+/* Print */
+@media print{
+  body{background:#fff;color:#000}
+  .no-print{display:none !important}
+  .print-area{display:block}
+}
+.print-area{display:none}
+
+/* Ticket 58/80mm */
+#ticket{width:58mm;padding:4mm 3mm;font:12px/1.3 "SFMono-Regular", ui-monospace, Menlo, monospace;color:#000;background:#fff}
+#ticket .center{text-align:center}
+#ticket .bold{font-weight:700}
+#ticket .line{border-top:1px dashed #000;margin:6px 0}
+#ticket .totals{display:flex;justify-content:space-between}
+#ticket img{max-width:100%;height:auto;display:block;margin:4px auto}
+#ticket .sm{font-size:11px}
+
+/* Lock screen */
 #lock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(11,16,32,.95);z-index:9999}
-.lock-card{width:min(360px,92vw);background:#121935;border:1px solid #1e2750;border-radius:16px;padding:18px}
+.lock-card{width:min(360px,92vw);background:#121935;border:1px solid #1e2750;border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.lock-card h2{margin:0 0 8px}
+.lock-msg{height:18px;font-size:12px;color:#ffb4b4}
 </style>
 </head>
 <body>
-<div id="lock"><div class="lock-card">
-  <h2>Recibos MAN • Acceso</h2>
-  <p class="small">PIN por defecto: <b>1029</b></p>
-  <input id="pin_input" type="password" inputmode="numeric" placeholder="PIN">
-  <button onclick="tryUnlock()">Desbloquear</button>
-  <div id="lock_msg" class="small" style="color:#ffb4b4;height:18px"></div>
-</div></div>
 
-<div id="app" style="display:none">
-  <div class="container">
-    <h1>Recibos MAN Comunication</h1>
-    <div class="grid">
-      <div class="card">
-        <h2>Preferencias</h2>
-        <label>Nombre del negocio</label><input id="p_biz" value="MAN Comunication">
-        <label>RFC / Leyenda</label><input id="p_legal">
-        <label>Domicilio / Teléfono</label><input id="p_addr">
-        <label>Ancho del papel</label><select id="p_width"><option value="58" selected>58 mm</option><option value="80">80 mm</option></select>
-        <label>Logo</label><input type="file" id="p_logo" accept="image/*" />
-        <div><button onclick="savePrefs()">Guardar</button><button onclick="clearLogo()">Quitar logo</button></div>
-        <h3>Seguridad</h3>
-        <label>Nuevo PIN</label><input id="p_pin" type="password" inputmode="numeric" placeholder="Ej. 1029">
-        <div><button onclick="changePIN()">Cambiar PIN</button></div>
-        <div class="small">El PIN vive sólo en este dispositivo.</div>
-      </div>
-      <div class="card">
-        <h2>Búsqueda / Historial</h2>
-        <button onclick="exportJSON()">Exportar respaldo (.json)</button>
-        <input type="file" id="importFile" style="display:none" accept=".json" onchange="importJSON(event)">
-        <button onclick="document.getElementById('importFile').click()">Importar respaldo</button>
-        <div id="msg" class="small" style="margin-top:8px"></div>
-      </div>
+<!-- LOCK SCREEN -->
+<div id="lock">
+  <div class="lock-card">
+    <h2>Recibos MAN • Acceso</h2>
+    <p class="small">Ingresa tu PIN para desbloquear (por defecto <b>1029</b>)</p>
+    <label>PIN</label>
+    <input id="pin_input" type="password" inputmode="numeric" placeholder="••••" autocomplete="one-time-code">
+    <div class="actions" style="margin-top:10px">
+      <button onclick="tryUnlock()">Desbloquear</button>
     </div>
+    <div id="lock_msg" class="lock-msg"></div>
   </div>
 </div>
 
-<div class="print-area" id="print-ticket"></div>
+<!-- APP -->
+<div id="app" style="display:none">
+<div class="container">
+  <h1>Recibos MAN Comunication</h1>
+  <div class="row no-print" style="margin:8px 0">
+    <button id="btnInstall" style="display:none">Instalar app</button>
+    <button onclick="shareLast()">Compartir último recibo (texto)</button>
+    <button onclick="downloadLastTXT()">Descargar recibo (.txt)</button>
+    <button onclick="printTicket()">Imprimir/Guardar PDF del recibo</button>
+  </div>
+
+  <div class="grid no-print">
+    <div class="card">
+      <h2>Nuevo pago</h2>
+      <div class="row">
+        <div style="flex:1">
+          <label>Cliente (buscar/crear)</label>
+          <input id="searchClient" placeholder="Escribe nombre o email y ENTER para buscar/crear">
+        </div>
+        <div style="width:160px">
+          <label>Folio</label>
+          <input id="folio" type="number" min="1">
+        </div>
+      </div>
+      <div class="row">
+        <div style="flex:1">
+          <label>Concepto</label>
+          <input id="concept" placeholder="Mensualidad Internet">
+        </div>
+        <div style="width:150px">
+          <label>Fecha pago</label>
+          <input id="date" type="date">
+        </div>
+        <div style="width:150px">
+          <label>Monto (MXN)</label>
+          <input id="amount" type="number" step="0.01" min="0" placeholder="Si lo dejas vacío, usa la cuota * meses">
+        </div>
+      </div>
+      <div class="row">
+        <div style="width:160px">
+          <label>Periodo inicio (YYYY-MM)</label>
+          <input id="period_start" placeholder="2025-08">
+        </div>
+        <div style="width:150px">
+          <label>Meses cubiertos</label>
+          <input id="months" type="number" min="1" value="1">
+        </div>
+        <div style="width:180px">
+          <label>Forma de pago</label>
+          <select id="method">
+            <option value="EFECTIVO" selected>EFECTIVO</option>
+            <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+            <option value="TARJETA">TARJETA</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div style="flex:1">
+          <label>Notas (opcional)</label>
+          <input id="notes" placeholder="Observaciones">
+        </div>
+      </div>
+      <div class="actions" style="margin-top:10px">
+        <button onclick="savePayment()">Guardar + Imprimir</button>
+        <button onclick="printLast()">Reimprimir último</button>
+      </div>
+      <div class="small" id="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Búsqueda / Historial</h2>
+      <div class="row">
+        <div style="flex:1">
+          <label>Cliente</label>
+          <input id="f_client" placeholder="Nombre o email">
+        </div>
+        <div style="width:150px">
+          <label>Desde</label>
+          <input id="f_from" type="date">
+        </div>
+        <div style="width:150px">
+          <label>Hasta</label>
+          <input id="f_to" type="date">
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button onclick="filter()">Filtrar</button>
+        <button onclick="exportJSON()">Exportar respaldo (.json)</button>
+        <input type="file" id="importFile" style="display:none" accept=".json" onchange="importJSON(event)">
+        <button onclick="document.getElementById('importFile').click()">Importar respaldo</button>
+      </div>
+      <table class="table" id="tbl">
+        <thead>
+          <tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Periodo</th><th>Meses</th><th>Método</th><th class="right">Monto</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Clientes</h2>
+      <div class="row">
+        <div style="flex:1">
+          <label>Nombre</label>
+          <input id="c_name" placeholder="Nombre del cliente">
+        </div>
+        <div style="flex:1">
+          <label>Email</label>
+          <input id="c_email" placeholder="Opcional">
+        </div>
+        <div style="flex:1">
+          <label>Teléfono</label>
+          <input id="c_phone" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="row">
+        <div style="width:180px">
+          <label>Inicio servicio (YYYY-MM)</label>
+          <input id="c_start" placeholder="2025-01">
+        </div>
+        <div style="width:150px">
+          <label>Cuota mensual (MXN)</label>
+          <input id="c_fee" type="number" value="300">
+        </div>
+      </div>
+      <div class="actions" style="margin-top:8px">
+        <button onclick="addClient()">Agregar / Actualizar</button>
+        <button onclick="listClients()">Listar</button>
+      </div>
+      <table class="table" id="tblClients" style="margin-top:6px">
+        <thead><tr><th>ID</th><th>Nombre</th><th>Email</th><th>Tel</th><th>Inicio</th><th>Cuota</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Corte de caja (mensual)</h2>
+      <div class="row">
+        <div style="width:160px">
+          <label>Mes (YYYY-MM)</label>
+          <input id="rep_month" placeholder="2025-08">
+        </div>
+        <div class="actions">
+          <button onclick="runMonthlyReport()">Ver corte</button>
+          <button onclick="printReport()">Imprimir/Guardar PDF</button>
+          <button onclick="downloadReportTXT()">Descargar TXT</button>
+        </div>
+      </div>
+      <div id="report" class="small"></div>
+    </div>
+
+    <div class="card">
+      <h2>Estado de cuenta por cliente</h2>
+      <div class="row">
+        <div style="width:120px">
+          <label>ID cliente</label>
+          <input id="st_client_id" type="number" min="1">
+        </div>
+        <div style="width:160px">
+          <label>Hasta (YYYY-MM)</label>
+          <input id="st_until" placeholder="2025-08">
+        </div>
+        <div class="actions">
+          <button onclick="runStatement()">Ver estado</button>
+          <button onclick="printStatement()">Imprimir/Guardar PDF</button>
+          <button onclick="downloadStatementTXT()">Descargar TXT</button>
+        </div>
+      </div>
+      <div id="statement" class="small"></div>
+    </div>
+
+    <div class="card">
+      <h2>Clientes con adeudo</h2>
+      <div class="row">
+        <div style="width:160px">
+          <label>Mes de corte (YYYY-MM)</label>
+          <input id="due_month" placeholder="2025-08">
+        </div>
+        <div class="actions">
+          <button onclick="runDebtors()">Mostrar adeudos</button>
+          <button onclick="printDebtors()">Imprimir/Guardar PDF</button>
+          <button onclick="downloadDebtorsTXT()">Descargar TXT</button>
+        </div>
+      </div>
+      <div id="debtors" class="small"></div>
+    </div>
+
+    <div class="card">
+      <h2>Preferencias</h2>
+      <label>Nombre del negocio</label>
+      <input id="p_biz" value="MAN Comunication">
+      <label>RFC / Leyenda</label>
+      <input id="p_legal" placeholder="RFC/leyenda (opcional)">
+      <label>Domicilio / Teléfono</label>
+      <textarea id="p_addr" rows="3" placeholder="Dirección, Teléfono"></textarea>
+      <label>Ancho del papel</label>
+      <select id="p_width">
+        <option value="58" selected>58 mm</option>
+        <option value="80">80 mm</option>
+      </select>
+      <label>Logo (PNG/JPG) — se guarda en la app</label>
+      <input type="file" id="p_logo" accept="image/*" />
+      <div class="actions" style="margin-top:8px">
+        <button onclick="savePrefs()">Guardar</button>
+        <button onclick="clearLogo()">Quitar logo</button>
+        <button onclick="window.print()">Probar impresión</button>
+      </div>
+      <div class="small" style="margin-bottom:12px">El logo queda guardado en tu dispositivo (offline). Para que aparezca en el ticket, cárgalo aquí.</div>
+
+      <h3 style="margin-top:10px">Seguridad</h3>
+      <label>Nuevo PIN</label>
+      <input id="p_pin" type="password" inputmode="numeric" placeholder="Ej. 1029">
+      <div class="actions" style="margin-top:6px">
+        <button onclick="changePIN()">Cambiar PIN</button>
+      </div>
+      <div class="small">Si no has definido uno, el PIN por defecto es <b>1029</b>. El PIN vive sólo en este dispositivo.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- PRINT AREAS -->
+<div class="print-area" id="print-ticket">
+  <div id="ticket">
+    <div class="center">
+      <img id="t_logo" src="" alt="Logo">
+      <div id="t_biz" class="bold">MAN Comunication</div>
+      <div id="t_legal" class="sm"></div>
+      <div id="t_addr" class="sm"></div>
+    </div>
+    <div class="line"></div>
+    <div>Folio: <span id="t_folio"></span></div>
+    <div>Fecha: <span id="t_date"></span></div>
+    <div>Cliente: <span id="t_client"></span></div>
+    <div>Periodo: <span id="t_period"></span>  <span id="t_months"></span></div>
+    <div>Concepto: <span id="t_concept"></span></div>
+    <div>Método: <span id="t_method"></span></div>
+    <div class="line"></div>
+    <div class="totals"><span>Total</span><span id="t_total"></span></div>
+    <div class="line"></div>
+    <div class="center sm">Gracias por su pago</div>
+    <div class="center sm">Este es un recibo simple, no fiscal</div>
+  </div>
+</div>
+
+<div class="print-area" id="print-report"></div>
+<div class="print-area" id="print-statement"></div>
+<div class="print-area" id="print-debtors"></div>
+
 <script>
-// SW
+// ---- PWA: install prompt ----
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault(); deferredPrompt = e;
+  const btn = document.getElementById('btnInstall'); if(btn) btn.style.display = 'inline-block';
+});
+document.getElementById('btnInstall')?.addEventListener('click', async ()=>{
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt(); await deferredPrompt.userChoice;
+  deferredPrompt = null; document.getElementById('btnInstall').style.display = 'none';
+});
 if('serviceWorker' in navigator){ window.addEventListener('load', ()=>{
   navigator.serviceWorker.register('./service-worker.js').catch(console.warn);
 });}
 
-// PIN
+// -------------------- SECURITY (PIN) --------------------
 function getStoredPin(){ return localStorage.getItem('pin_mc') || '1029'; }
 function tryUnlock(){
-  const v = (document.getElementById('pin_input').value||'').trim();
-  if(!v){ document.getElementById('lock_msg').textContent='Escribe el PIN'; return; }
-  if(v===getStoredPin()){
+  const input = document.getElementById('pin_input').value.trim();
+  const valid = getStoredPin();
+  if(!input){ document.getElementById('lock_msg').textContent='Escribe el PIN'; return; }
+  if(input === valid){
     document.getElementById('lock').style.display='none';
     document.getElementById('app').style.display='block';
     initApp();
-  }else{
+  } else {
     document.getElementById('lock_msg').textContent='PIN incorrecto';
   }
 }
 function changePIN(){
-  const np = (document.getElementById('p_pin').value||'').trim();
-  if(!np || np.length<4){ return msg('PIN mínimo 4 dígitos'); }
+  const np = document.getElementById('p_pin').value.trim();
+  if(!np || np.length < 4){ return msg('PIN mínimo 4 dígitos'); }
   localStorage.setItem('pin_mc', np);
   document.getElementById('p_pin').value='';
   msg('PIN actualizado');
 }
 
-// DB (minimal skeleton to support backup/restore)
-const dbName='caja_db_v3'; const state={db:null};
-function openDB(){ return new Promise((resolve,reject)=>{
-  const req = indexedDB.open(dbName,1);
-  req.onupgradeneeded=(e)=>{
-    const db=e.target.result;
-    const clients=db.createObjectStore('clients',{keyPath:'id',autoIncrement:true});
-    clients.createIndex('name','name',{unique:false});
-    const pays=db.createObjectStore('payments',{keyPath:'id',autoIncrement:true});
-    pays.createIndex('period_start','period_start',{unique:false});
-    pays.createIndex('client_id','client_id',{unique:false});
-    db.createObjectStore('meta',{keyPath:'key'});
-  };
-  req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
-});}
-function tx(store,mode='readonly'){ return state.db.transaction(store,mode).objectStore(store); }
-const $ = (id)=>document.getElementById(id);
-function msg(t){ const el=$('msg'); if(el){ el.textContent=t; setTimeout(()=>el.textContent='',2500);} }
+// --------- DB ----------
+const dbName = 'caja_db_v3';
+const state = { db:null, lastReceipt:null };
 
+function openDB(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(dbName, 1);
+    req.onupgradeneeded = (e)=>{
+      const db = e.target.result;
+      const clients = db.createObjectStore('clients', { keyPath:'id', autoIncrement:true });
+      clients.createIndex('name','name',{unique:false});
+      const pays = db.createObjectStore('payments', { keyPath:'id', autoIncrement:true });
+      pays.createIndex('period_start','period_start',{unique:false});
+      pays.createIndex('client_id','client_id',{unique:false});
+      db.createObjectStore('meta', { keyPath:'key' });
+    };
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+function tx(store, mode='readonly'){ return state.db.transaction(store, mode).objectStore(store); }
+
+// ---------- Helpers ----------
+const $ = (id)=>document.getElementById(id);
+const today = ()=>new Date().toISOString().slice(0,10);
+function curYYYYMM(){ const d=new Date(); return d.toISOString().slice(0,7); }
+function fmt(n){return new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(Number(n||0))}
+function addMonths(ym, inc){ const [y,m]=ym.split('-').map(Number); const d=new Date(y, m-1+inc, 1); return d.toISOString().slice(0,7); }
+function monthsBetween(a,b){ const out=[]; let cur=a; while(cur<=b){ out.push(cur); cur = addMonths(cur,1); } return out; }
+
+// ---------- Preferences & Logo ----------
 function loadPrefs(){
   const d = JSON.parse(localStorage.getItem('prefs_mc')||'{}');
-  $('p_biz').value=d.biz||'MAN Comunication'; $('p_legal').value=d.legal||''; $('p_addr').value=d.addr||''; $('p_width').value=d.width||'58';
+  $('p_biz').value = d.biz||'MAN Comunication';
+  $('p_legal').value = d.legal||'';
+  $('p_addr').value = d.addr||'';
+  $('p_width').value = d.width||'58';
+  const logo = localStorage.getItem('logo_mc') || '';
+  const tlogo = $('t_logo'); if(tlogo) tlogo.src = logo; // si no hay, queda vacío
+  $('t_biz').textContent = $('p_biz').value;
+  $('t_legal').textContent = $('p_legal').value;
+  $('t_addr').textContent = $('p_addr').value;
+  const tk = document.querySelector('#ticket');
+  if(tk) tk.style.width = (d.width||'58')+'mm';
 }
 function savePrefs(){
-  const d={biz:$('p_biz').value.trim(),legal:$('p_legal').value.trim(),addr:$('p_addr').value.trim(),width:$('p_width').value};
+  const d = { biz:$('p_biz').value.trim(), legal:$('p_legal').value.trim(), addr:$('p_addr').value.trim(), width:$('p_width').value };
   localStorage.setItem('prefs_mc', JSON.stringify(d));
-  const file=$('p_logo').files[0];
-  if(file){ const r=new FileReader(); r.onload=()=>{localStorage.setItem('logo_mc', r.result); loadPrefs(); msg('Preferencias + logo guardados');}; r.readAsDataURL(file); }
-  else { loadPrefs(); msg('Preferencias guardadas'); }
+  const file = document.getElementById('p_logo').files[0];
+  if(file){
+    const r = new FileReader();
+    r.onload = ()=>{ localStorage.setItem('logo_mc', r.result); loadPrefs(); msg('Preferencias + logo guardados'); };
+    r.readAsDataURL(file);
+  } else {
+    loadPrefs(); msg('Preferencias guardadas');
+  }
 }
 function clearLogo(){ localStorage.removeItem('logo_mc'); loadPrefs(); msg('Logo eliminado'); }
 
-function exportJSON(){
-  const ps = tx('payments').getAll(); const cs = tx('clients').getAll(); const m = tx('meta').getAll();
-  ps.onsuccess=()=>{ cs.onsuccess=()=>{ m.onsuccess=()=>{
-    const data={clients:cs.result,payments:ps.result,meta:m.result};
-    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='respaldo_recibos.json'; a.rel='noopener'; a.target='_blank'; a.click();
-  };};};
+// ---------- Folio ----------
+async function nextFolio(){
+  return new Promise((resolve,reject)=>{
+    const store = tx('meta','readwrite');
+    const get = store.get('folio');
+    get.onsuccess = ()=>{ const cur = get.result? get.result.value : 0; const next = cur + 1; store.put({key:'folio', value: next}); resolve(next); };
+    get.onerror = ()=>reject(get.error);
+  });
 }
-function importJSON(evt){
-  const file=evt.target.files[0]; if(!file) return;
-  const r=new FileReader();
-  r.onload=()=>{
-    try{
-      const data=JSON.parse(r.result);
-      const t1=tx('clients','readwrite'); const t2=tx('payments','readwrite'); const t3=tx('meta','readwrite');
-      (data.clients||[]).forEach(c=>t1.put(c)); (data.payments||[]).forEach(p=>t2.put(p)); (data.meta||[]).forEach(x=>t3.put(x));
-      msg('Importado correctamente');
-    }catch(e){ msg('Error al importar: '+e.message); }
-  };
-  r.readAsText(file);
+async function readFolio(){
+  return new Promise((resolve)=>{
+    const store = tx('meta'); const get = store.get('folio');
+    get.onsuccess = ()=>resolve(get.result? get.result.value : 0); get.onerror = ()=>resolve(0);
+  });
 }
 
-async function initApp(){ state.db = await openDB(); loadPrefs(); }
+// ---------- Clients ----------
+async function addClient(){
+  const name = $('c_name').value.trim(); if(!name){ return msg('Escribe un nombre'); }
+  const email = $('c_email').value.trim(); const phone = $('c_phone').value.trim();
+  const start = $('c_start').value.trim(); const fee = Number($('c_fee').value||300);
+  const store = tx('clients','readwrite'); const all = store.getAll();
+  all.onsuccess = ()=>{
+    const existing = all.result.find(c=> (email && c.email===email) || c.name.toLowerCase()===name.toLowerCase());
+    if(existing){
+      Object.assign(existing, {name,email,phone, service_start:start||existing.service_start||curYYYYMM(), fee: fee||300});
+      store.put(existing); msg('Cliente actualizado'); listClients();
+    } else {
+      store.add({name,email,phone, service_start: start||curYYYYMM(), fee: fee||300, created_at:new Date().toISOString()});
+      msg('Cliente agregado'); listClients();
+    }
+  }
+}
+function listClients(){
+  const store = tx('clients'); const req = store.getAll();
+  req.onsuccess = ()=>{
+    const tbody = $('tblClients').querySelector('tbody');
+    tbody.innerHTML = req.result.sort((a,b)=>a.id-b.id).map(c=>`<tr>
+      <td>${c.id}</td><td>${c.name||''}</td><td>${c.email||''}</td><td>${c.phone||''}</td>
+      <td>${c.service_start||''}</td><td>${c.fee||300}</td>
+    </tr>`).join('');
+  }
+}
+function setupSearchBox(){
+  $('searchClient').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){
+      const q = $('searchClient').value.trim().toLowerCase();
+      const store = tx('clients'); const req = store.getAll();
+      req.onsuccess = ()=>{
+        let c = req.result.find(x=> (x.name||'').toLowerCase().includes(q) || (x.email||'').toLowerCase().includes(q));
+        if(!c){
+          const name = $('searchClient').value.trim();
+          const w = tx('clients','readwrite'); const add = w.add({name, email:'', phone:'', service_start: curYYYYMM(), fee:300, created_at:new Date().toISOString()});
+          add.onsuccess = ()=>{ msg('Cliente creado'); $('searchClient').dataset.client_id = add.result; };
+        } else {
+          $('searchClient').value = c.name; $('searchClient').dataset.client_id = c.id; msg('Cliente seleccionado: ID '+c.id);
+        }
+      }
+    }
+  });
+}
+
+// ---------- Payments ----------
+async function savePayment(){
+  let client_id = Number($('searchClient').dataset.client_id||0);
+  const name = $('searchClient').value.trim();
+  if(!client_id && name){
+    const add = tx('clients','readwrite').add({name, email:'', phone:'', service_start: curYYYYMM(), fee:300, created_at:new Date().toISOString()});
+    await new Promise(r=>{ add.onsuccess=()=>r(); });
+    client_id = add.result;
+  }
+  if(!client_id){ return msg('Selecciona o crea un cliente (ENTER en el buscador)'); }
+
+  let folio = Number($('folio').value||0); if(!folio){ folio = await nextFolio(); $('folio').value = folio; }
+
+  const concept = $('concept').value.trim() || 'Mensualidad Internet';
+  const date = $('date').value || today();
+  let amount = parseFloat($('amount').value);
+  const method = $('method').value;
+  const notes = $('notes').value.trim();
+  const period_start = $('period_start').value || curYYYYMM();
+  const months = Math.max(1, Number($('months').value||1));
+
+  // DEFAULT AMOUNT: fee * months if blank/NaN/<=0
+  const client = tx('clients').get(client_id); await new Promise(res=> client.onsuccess=()=>res());
+  const fee = (client.result && Number(client.result.fee)) || 300;
+  if(!(amount>0)){ amount = fee * months; $('amount').value = amount; }
+
+  const store = tx('payments','readwrite');
+  const add = store.add({ folio, date, client_id, concept, amount, method, notes, period_start, months, created_at:new Date().toISOString() });
+  add.onsuccess = ()=>{
+    msg('Pago guardado'); const p = { folio, date, client_id, concept, amount, method, notes, period_start, months };
+    state.lastReceipt = p; printReceipt(p); filter();
+  };
+}
+function printReceipt(p){
+  const cstore = tx('clients'); const get = cstore.get(p.client_id);
+  get.onsuccess = ()=>{
+    const c = get.result||{name:'(Sin nombre)'};
+    const prefs = JSON.parse(localStorage.getItem('prefs_mc')||'{}');
+    $('t_biz').textContent = prefs.biz||'MAN Comunication';
+    $('t_legal').textContent = prefs.legal||'';
+    $('t_addr').textContent = prefs.addr||'';
+    const tk = document.querySelector('#ticket'); if(tk) tk.style.width = (prefs.width||'58')+'mm';
+    const logo = localStorage.getItem('logo_mc')||''; const tlogo = $('t_logo'); if(tlogo) tlogo.src = logo;
+
+    $('t_folio').textContent = p.folio;
+    $('t_date').textContent = p.date;
+    $('t_client').textContent = c.name;
+    $('t_concept').textContent = p.concept + (p.notes? (' - '+p.notes):'');
+    $('t_method').textContent = p.method;
+    $('t_total').textContent = fmt(p.amount);
+    $('t_period').textContent = p.period_start;
+    $('t_months').textContent = p.months>1? `(${p.months} meses)` : '';
+    setTimeout(()=>window.print(), 50);
+  }
+}
+function printLast(){ if(state.lastReceipt){ printReceipt(state.lastReceipt); } else { msg('Aún no hay recibo para reimprimir'); } }
+function printTicket(){ window.print(); }
+
+// ---- Share helpers ----
+function receiptAsText(r, clientName){
+  const prefs = JSON.parse(localStorage.getItem('prefs_mc')||'{}');
+  return `${prefs.biz||'MAN Comunication'}
+${prefs.legal||''}
+${prefs.addr||''}
+
+RECIBO SIMPLE
+Folio: ${r.folio}
+Fecha: ${r.date}
+Cliente: ${clientName}
+Periodo: ${r.period_start} ${r.months>1?`(${r.months} meses)`:''}
+Concepto: ${r.concept}${r.notes?(' - '+r.notes):''}
+Método: ${r.method}
+Total: ${fmt(r.amount)}
+
+Gracias por su pago.`.trim();
+}
+function shareLast(){
+  if(!state.lastReceipt){ return msg('No hay recibo reciente para compartir'); }
+  const cget = tx('clients').get(state.lastReceipt.client_id);
+  cget.onsuccess = ()=>{
+    const c = cget.result||{name:'(Sin nombre)'};
+    const text = receiptAsText(state.lastReceipt, c.name);
+    if(navigator.share){ navigator.share({ title:'Recibo', text }).catch(()=>{}); }
+    else { navigator.clipboard.writeText(text).then(()=>msg('Recibo copiado. Pega en WhatsApp/Correo.')); }
+  }
+}
+function downloadLastTXT(){
+  if(!state.lastReceipt){ return msg('No hay recibo reciente'); }
+  const cget = tx('clients').get(state.lastReceipt.client_id);
+  cget.onsuccess = ()=>{
+    const c = cget.result||{name:'(Sin nombre)'};
+    const text = receiptAsText(state.lastReceipt, c.name);
+    const blob = new Blob([text], {type:'text/plain'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `recibo_${state.lastReceipt.folio}.txt`; a.rel="noopener"; a.target="_blank"; a.click();
+  }
+}
+
+// ---------- List/Filter ----------
+function filter(){
+  const q = $('f_client').value.trim().toLowerCase();
+  const from = $('f_from').value? new Date($('f_from').value).toISOString().slice(0,10) : null;
+  const to = $('f_to').value? new Date($('f_to').value).toISOString().slice(0,10) : null;
+  const pays = tx('payments').getAll(); const clients = tx('clients').getAll();
+  pays.onsuccess = ()=>{ clients.onsuccess = ()=>{
+    const cmap = new Map(clients.result.map(c=>[c.id,c])); let rows = pays.result;
+    if(q){ rows = rows.filter(p=> (cmap.get(p.client_id)?.name||'').toLowerCase().includes(q) || (cmap.get(p.client_id)?.email||'').toLowerCase().includes(q)); }
+    if(from){ rows = rows.filter(p=> p.date>=from); } if(to){ rows = rows.filter(p=> p.date<=to); }
+    rows.sort((a,b)=> b.id-a.id);
+    const tbody = $('tbl').querySelector('tbody');
+    tbody.innerHTML = rows.map(p=>{
+      const c = cmap.get(p.client_id)||{};
+      return `<tr>
+        <td>${p.folio}</td><td>${p.date}</td><td>${(c.name||'')}</td><td>${p.period_start}</td><td>${p.months}</td>
+        <td>${p.method}</td><td class="right">${fmt(p.amount)}</td>
+        <td><button onclick='reprint(${p.id})'>Reimprimir</button></td>
+      </tr>`
+    }).join('');
+  }; };
+}
+function reprint(id){ const store = tx('payments'); const get = store.get(id); get.onsuccess = ()=>{ const p = get.result; if(p){ state.lastReceipt = p; printReceipt(p); } }}
+
+// ---------- Report (monthly corte) ----------
+function monthsCovered(p){ const arr=[]; for(let i=0;i<p.months;i++){ arr.push(addMonths(p.period_start, i)); } return arr; }
+function runMonthlyReport(){
+  const ym = $('rep_month').value || curYYYYMM();
+  const pays = tx('payments').getAll(); const clients = tx('clients').getAll();
+  pays.onsuccess = ()=>{ clients.onsuccess = ()=>{
+    const cmap = new Map(clients.result.map(c=>[c.id,c]));
+    const rows = pays.result.filter(p=> monthsCovered(p).includes(ym)).sort((a,b)=> a.date.localeCompare(b.date));
+    const total = rows.reduce((s,p)=>s+Number(p.amount||0),0);
+    const html = [`<h2>Corte mensual ${ym}</h2>`,
+      `<table class="table"><thead><tr><th>Fecha</th><th>Cliente</th><th>Folio</th><th>Periodo</th><th>Meses</th><th class="right">Monto</th></tr></thead><tbody>`,
+      rows.map(p=>`<tr><td>${p.date}</td><td>${(cmap.get(p.client_id)?.name||'')}</td><td>${p.folio}</td><td>${p.period_start}</td><td>${p.months}</td><td class="right">${fmt(p.amount)}</td></tr>`).join(''),
+      `</tbody><tfoot><tr><th colspan="5" class="right">Total</th><th class="right">${fmt(total)}</th></tr></tfoot></table>`
+    ].join('');
+    $('report').innerHTML = html; $('print-report').innerHTML = html;
+  }; };
+}
+function printReport(){ window.print(); }
+function downloadReportTXT(){ const text = document.getElementById('report').innerText || 'Sin datos'; const blob = new Blob([text], {type:'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'corte_mensual.txt'; a.rel="noopener"; a.target="_blank"; a.click(); }
+
+// ---------- Statement (client) ----------
+function runStatement(){
+  const id = Number($('st_client_id').value||0); const until = $('st_until').value || curYYYYMM();
+  if(!id){ return msg('Escribe ID de cliente'); }
+  const cget = tx('clients').get(id);
+  cget.onsuccess = ()=>{
+    const c = cget.result; if(!c){ $('statement').innerHTML = 'Cliente no encontrado'; return; }
+    const pays = tx('payments').getAll();
+    pays.onsuccess = ()=>{
+      const clientPays = pays.result.filter(p=>p.client_id===id);
+      const paid = new Set(); clientPays.forEach(p=> monthsCovered(p).forEach(m=>paid.add(m)) );
+      const monthsAll = monthsBetween(c.service_start||curYYYYMM(), until);
+      const pending = monthsAll.filter(m=>!paid.has(m));
+      const totalPaid = clientPays.reduce((s,p)=>s+Number(p.amount||0),0);
+      const html = [`<h2>Estado de cuenta: ${c.name} (ID ${id})</h2>`,
+        `<div>Inicio servicio: ${c.service_start||''} • Cuota mensual: ${fmt(c.fee||300)}</div><br>`,
+        `<h3>Pagos realizados</h3>`,
+        `<table class="table"><thead><tr><th>Fecha</th><th>Folio</th><th>Periodo</th><th>Meses</th><th class="right">Monto</th></tr></thead><tbody>`,
+        clientPays.sort((a,b)=>a.date.localeCompare(b.date)).map(p=>`<tr><td>${p.date}</td><td>${p.folio}</td><td>${p.period_start}</td><td>${p.months}</td><td class="right">${fmt(p.amount)}</td></tr>`).join(''),
+        `</tbody><tfoot><tr><th colspan="4" class="right">Total pagado</th><th class="right">${fmt(totalPaid)}</th></tr></tfoot></table>`,
+        `<h3>Meses pendientes hasta ${until}</h3>`,
+        pending.length? `<div>${pending.join(', ')}</div>` : `<div>Sin adeudos</div>`
+      ].join('');
+      $('statement').innerHTML = html; $('print-statement').innerHTML = html;
+    };
+  };
+}
+function printStatement(){ window.print(); }
+function downloadStatementTXT(){ const text = document.getElementById('statement').innerText || 'Sin datos'; const blob = new Blob([text], {type:'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'estado_de_cuenta.txt'; a.rel="noopener"; a.target="_blank"; a.click(); }
+
+// ---------- Debtors (adeudos) ----------
+function runDebtors(){
+  const ym = $('due_month').value || curYYYYMM();
+  const cs = tx('clients').getAll(); const ps = tx('payments').getAll();
+  cs.onsuccess = ()=>{ ps.onsuccess = ()=>{
+    const clients = cs.result; const pays = ps.result;
+    // Build map of months paid per client
+    const paidMap = new Map(); clients.forEach(c=>paidMap.set(c.id, new Set()));
+    pays.forEach(p=> monthsCovered(p).forEach(m=> paidMap.get(p.client_id)?.add(m)));
+    const debtors = clients.filter(c=>{
+      // If service start after ym, skip
+      if((c.service_start||'9999-12') > ym) return false;
+      return !paidMap.get(c.id)?.has(ym);
+    });
+    const html = [`<h2>Adeudos del mes ${ym}</h2>`,
+      `<table class="table"><thead><tr><th>ID</th><th>Cliente</th><th>Inicio</th><th>Cuota</th></tr></thead><tbody>`,
+      debtors.map(c=>`<tr><td>${c.id}</td><td>${c.name||''}</td><td>${c.service_start||''}</td><td>${fmt(c.fee||300)}</td></tr>`).join(''),
+      `</tbody><tfoot><tr><th colspan="3" class="right">Total deudores</th><th class="right">${debtors.length}</th></tr></tfoot></table>`
+    ].join('');
+    $('debtors').innerHTML = html; $('print-debtors').innerHTML = html;
+  }; };
+}
+function printDebtors(){ window.print(); }
+function downloadDebtorsTXT(){ const text = document.getElementById('debtors').innerText || 'Sin datos'; const blob = new Blob([text], {type:'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'adeudos.txt'; a.rel="noopener"; a.target="_blank"; a.click(); }
+
+// ---------- Export / Import ----------
+function exportJSON(){
+  const ps = tx('payments').getAll(); const cs = tx('clients').getAll(); const m = tx('meta').getAll();
+  ps.onsuccess = ()=>{ cs.onsuccess = ()=>{ m.onsuccess = ()=>{
+    const data = { clients: cs.result, payments: ps.result, meta: m.result };
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'respaldo_recibos.json'; a.rel="noopener"; a.target="_blank"; a.click();
+  }; }; };
+}
+function importJSON(evt){
+  const file = evt.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      const t1 = tx('clients','readwrite'); const t2 = tx('payments','readwrite'); const t3 = tx('meta','readwrite');
+      (data.clients||[]).forEach(c=> t1.put(c));
+      (data.payments||[]).forEach(p=> t2.put(p));
+      (data.meta||[]).forEach(x=> t3.put(x));
+      msg('Importado correctamente'); filter(); listClients(); readFolio().then(f=> $('folio').value = f+1);
+    }catch(e){ msg('Error al importar: '+e.message); }
+  };
+  reader.readAsText(file);
+}
+
+// ---------- UI helpers ----------
+function msg(t){ const el = $('msg'); if(el){ el.textContent = t; setTimeout(()=>{el.textContent='';}, 2500);} }
+
+// ---------- Init (after unlock) ----------
+async function initApp(){
+  state.db = await openDB(); loadPrefs();
+  $('date').value = today(); $('period_start').value = curYYYYMM();
+  $('rep_month').value = curYYYYMM(); $('st_until').value = curYYYYMM(); $('due_month').value = curYYYYMM();
+  readFolio().then(f=> $('folio').value = f+1);
+  setupSearchBox(); filter();
+}
 </script>
 </body>
 </html>
